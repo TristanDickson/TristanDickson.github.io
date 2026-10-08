@@ -3,3 +3,4 @@
 tokens.json
 .env
 __pycache__/
+env
