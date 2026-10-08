@@ -18,7 +18,7 @@ python3 tesla_fleet.py register          # once
 python3 tesla_fleet.py auth-url          # open, log in, approve, copy the code from the address bar
 python3 tesla_fleet.py exchange <code>
 python3 tesla_fleet.py products          # prints the energy_site_id
-python3 tesla_fleet.py history           # yesterday's solar, battery, grid and home energy
+python3 tesla_fleet.py history [YYYY-MM-DD]   # a local day of 5-minute Wh buckets: solar, battery, grid, home; TESLA_KIND=power for 5-minute W samples
 ```
 
 ```bash

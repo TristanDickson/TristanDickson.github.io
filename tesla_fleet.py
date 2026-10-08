@@ -11,7 +11,8 @@ import secrets
 import sys
 import urllib.parse
 import urllib.request
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta
+from zoneinfo import ZoneInfo
 from pathlib import Path
 
 AUTH = "https://auth.tesla.com/oauth2/v3/authorize"
@@ -20,6 +21,7 @@ REGION = os.environ.get("TESLA_REGION", "eu")
 API = f"https://fleet-api.prd.{REGION}.vn.cloud.tesla.com"
 SCOPES = "openid offline_access energy_device_data"
 TOKENS = Path.home() / ".tesla-fleet" / "tokens.json"
+TIME_ZONE = os.environ.get("TESLA_TIME_ZONE", "Europe/London")
 
 
 def env(name: str) -> str:
@@ -121,13 +123,16 @@ def history() -> None:
     token = access_token()
     site = os.environ.get("TESLA_SITE_ID") or next(
         str(p["energy_site_id"]) for p in get(f"{API}/api/1/products", token)["response"] if "energy_site_id" in p)
-    yesterday = date.today() - timedelta(days=1)
+    # period=day returns the local day containing end_date, so the window is built in the site's zone.
+    tz = ZoneInfo(TIME_ZONE)
+    day = date.fromisoformat(sys.argv[2]) if len(sys.argv) > 2 else date.today() - timedelta(days=1)
+    kind = os.environ.get("TESLA_KIND", "energy")  # energy: 5-minute Wh buckets; power: 5-minute W samples
     params = urllib.parse.urlencode({
-        "kind": "energy",
+        "kind": kind,
         "period": "day",
-        "start_date": f"{yesterday}T00:00:00Z",
-        "end_date": f"{yesterday}T23:59:59Z",
-        "time_zone": "Europe/London",
+        "start_date": datetime.combine(day, time.min, tz).isoformat(),
+        "end_date": datetime.combine(day, time.max.replace(microsecond=0), tz).isoformat(),
+        "time_zone": TIME_ZONE,
     })
     print(json.dumps(get(f"{API}/api/1/energy_sites/{site}/calendar_history?{params}", token), indent=1))
 
@@ -136,7 +141,7 @@ if __name__ == "__main__":
     cmds = {"register": register, "auth-url": auth_url, "products": products, "history": history}
     if len(sys.argv) >= 3 and sys.argv[1] == "exchange":
         exchange(sys.argv[2])
-    elif len(sys.argv) == 2 and sys.argv[1] in cmds:
+    elif len(sys.argv) >= 2 and sys.argv[1] in cmds:
         cmds[sys.argv[1]]()
     else:
-        sys.exit("usage: tesla_fleet.py register | auth-url | exchange <code> | products | history")
+        sys.exit("usage: tesla_fleet.py register | auth-url | exchange <code> | products | history [YYYY-MM-DD]  (TESLA_KIND=energy|power)")
